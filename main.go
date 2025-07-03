@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -27,10 +26,10 @@ type User struct {
 
 type UserList struct {
 	Users []User `json:"users"`
+	Total int    `json:"total"`
 }
 
 func fetchOWUIStats(baseURL, token string) (loggedIn, total int, err error) {
-	// 1. Get all users
 	req, _ := http.NewRequest("GET", baseURL+"/api/v1/users/?page=0&order_by=created_at&direction=asc", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 
@@ -45,18 +44,9 @@ func fetchOWUIStats(baseURL, token string) (loggedIn, total int, err error) {
 	if err = json.NewDecoder(resp.Body).Decode(&users); err != nil {
 		return
 	}
-	total = len(users.Users)
+	total = users.Total
 
-	// 2. Query /api/usage with user IDs
-	ids := make([]string, total)
-	for i, u := range users.Users {
-		ids[i] = u.ID
-	}
-
-	usageReqData := UsageRequest{ModelIDs: []string{}, UserIDs: ids}
-	body, _ := json.Marshal(usageReqData)
-
-	usageReq, _ := http.NewRequest("GET", baseURL+"/api/usage", bytes.NewBuffer(body))
+	usageReq, _ := http.NewRequest("GET", baseURL+"/api/usage", nil)
 	usageReq.Header.Set("Authorization", "Bearer "+token)
 	usageReq.Header.Set("Content-Type", "application/json")
 
@@ -92,10 +82,13 @@ func metricsHandler(baseURL, token string) http.HandlerFunc {
 		fmt.Fprintf(w, "# HELP owui_total_users Total number of registered users\n")
 		fmt.Fprintf(w, "# TYPE owui_total_users gauge\n")
 		fmt.Fprintf(w, "owui_total_users %d\n", total)
+
+		log.Printf("Logged in users: %d, Total users: %d", loggedIn, total)
 	}
 }
 
 func main() {
+	// Load .env file but don't override existing environment variables
 	_ = godotenv.Load()
 
 	baseURL := os.Getenv("OWUI_BASE_URL")
