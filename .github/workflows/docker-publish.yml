@@ -10,6 +10,10 @@ on:
       - "*"
 
 jobs:
+  release:
+    permissions:
+      contents: read
+      packages: write
   helm-and-docker:
     runs-on: ubuntu-latest
     steps:
